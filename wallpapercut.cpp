@@ -1,7 +1,7 @@
 #include <iostream>
 #include <X11/Xlib.h>
 #include <Magick++.h>
-#include <string.h>
+#include <cstring>
 
 static std::string renamestr = "bak_";
 static int minargs = 2;
@@ -67,7 +67,19 @@ int main(int argc, char* argv[])
         std::cout << "not enough parameters" << std::endl;
         return 1;
     }
-    
+    /// check parameter options
+    int mode = 0;
+    int i = 1;
+    while(mode == 0 && i < argc)
+    {
+        if(strcmp(argv[i], "-l") == 0)
+            mode = 1;
+        else if(strcmp(argv[i], "-r") == 0)
+            mode = 2;
+        else
+            mode = 0;
+        i++;
+    }
     //// get screen resolution
     int width, height = 0;
     getScreenResolution(width, height);
@@ -93,8 +105,22 @@ int main(int argc, char* argv[])
             if(iwidth != img.columns())
             {
                 offsety = 0;
-                // center x offset
-                offsetx = (img.columns()-iwidth)/2;
+                // set image viewport according to mode
+                switch(mode)
+                {
+                    case 0:// center
+                        offsetx = (img.columns()-iwidth)/2;
+                        break;
+                    case 1:// left
+                        offsetx = 0;
+                        break;
+                    case 2:// right
+                        offsetx = img.columns()-iwidth;
+                        break;
+                    default:// defaults to center
+                        offsetx = (img.columns()-iwidth)/2;
+                        break;
+                }
                 
             }
             else

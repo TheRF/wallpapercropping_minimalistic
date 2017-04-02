@@ -2,9 +2,26 @@
 #include <X11/Xlib.h>
 #include <Magick++.h>
 #include <cstring>
-
+#include <limits>
 static std::string renamestr = "bak_";
 static int minargs = 2;
+static int aspectadjusttries = 5; // hack
+
+bool nearlyEqual(float a, float b, float epsilon) {
+		const float absA = abs(a);
+		const float absB = abs(b);
+		const float diff = abs(a - b);
+
+		if (a == b) { // shortcut, handles infinities
+			return true;
+		} else if (a == 0 || b == 0 || diff < std::numeric_limits<float>::min()) {
+			// a or b is zero or both are extremely close to it
+			// relative error is less meaningful here
+			return diff < (epsilon * std::numeric_limits<float>::min());
+		} else { // use relative error
+			return diff / std::min((absA + absB), std::numeric_limits<float>::max()) < epsilon;
+		}
+	}
 
 void getAspectRatio(int width, int height, int &w, int &h)
 {
@@ -19,32 +36,29 @@ void getAspectRatio(int width, int height, int &w, int &h)
     return;
 }
 
-void adjustImageResolution(int screenw, int screenh, int width, int height, int &w, int &h)
+void adjustImageResolution(int screenw, int screenh, int &w, int &h)
 {
     /// calc height using image width and screen aspect ratio
-    int imagew = width/screenw;
+    int imagew = w/screenw;
     int supimageh = imagew*screenh;
-    if(height > supimageh)
+    if(h > supimageh)
     {
         /// height bigger than aspect ratio
-        w = width;
         // get reduced height
         h = supimageh;
     }
-    else if (height < supimageh)
+    else if (h < supimageh)
     {
         /// height lower than aspect ratio
         // use height as default, reduce width
-        h = height;
-        int imageh = height/screenh;
+        int imageh = h/screenh;
         w = screenw*imageh;
     }
     else
     {
-        w = width;
-        h = height;
     }
 
+        std::cout << h << '_' << w << std::endl;
     return;
 }
 
@@ -95,9 +109,15 @@ int main(int argc, char* argv[])
         img.read(imgfile);
 
         //// change aspect ratio
-        int iwidth, iheight = 0;
+        int iwidth = img.columns();
+        int iheight = img.rows();
+        
+        // try circumvent rounding errors
+        int limit = 0; // hack
+        do
+        {    adjustImageResolution(screenratiow, screenratioh, iwidth, iheight); limit++;}
+        while(nearlyEqual((screenratiow/screenratioh), (iwidth/iheight), 0.00001f) && (iwidth>img.columns()/2) && limit < aspectadjusttries);
 
-        adjustImageResolution(screenratiow, screenratioh, img.columns(), img.rows(), iwidth, iheight);
         // set position of image frame
         int offsetx, offsety = 0;
         if(iwidth != img.columns() || iheight != img.rows())
